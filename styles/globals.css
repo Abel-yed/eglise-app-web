@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* --- Couleurs --- */
+  --color-ink: #16213A;          /* bleu nuit — texte principal, marque */
+  --color-ink-soft: #2C3A5E;     /* bleu nuit atténué — nav, en-têtes */
+  --color-gold: #B08A2E;         /* or discret — accent signature */
+  --color-gold-soft: #E8D9B5;    /* or très clair — fonds d'accent */
+  --color-bg: #F7F6F2;           /* fond général, blanc cassé sobre */
+  --color-surface: #FFFFFF;      /* cartes, panneaux */
+  --color-border: #E3E1D9;
+
+  --color-success: #2F6F4E;
+  --color-success-soft: #E6F0EA;
+  --color-danger: #A13D3D;
+  --color-danger-soft: #F5E9E7;
+  --color-info: #2A5A78;
+  --color-info-soft: #E7EEF2;
+
+  --color-text: #1F2430;
+  --color-text-muted: #6B7280;
+  --color-text-inverse: #FBFAF7;
+
+  /* --- Typographie --- */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* --- Radius / ombres --- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(22, 33, 58, 0.06);
+  --shadow-md: 0 4px 16px rgba(22, 33, 58, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  color: var(--color-ink);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: var(--font-body);
+}
+
+input, select, textarea {
+  font-family: var(--font-body);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+
+/* Scrollbar discrète */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
