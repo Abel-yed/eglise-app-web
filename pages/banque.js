@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { formatFCFA, formatDateCourte } from '../lib/format';
+import { normaliserLignesBanque } from '../lib/excelImport';
+import { exporterExcel, formatDateExport } from '../lib/excelExport';
+import { exporterPDF } from '../lib/pdfExport';
+import { exporterWord } from '../lib/docxExport';
+import ExcelImporter from '../components/ExcelImporter';
+import ExportButtons from '../components/ExportButtons';
 import {
   PageHeader, StatCard, Card, SectionTitle, Button, ToggleGroup,
   Field, fieldStyle, EmptyState, ListRow, IconButton, LoadingState, Badge,
@@ -67,17 +73,79 @@ export default function Banque() {
     }
   };
 
+  const exporter = () => {
+    const lignes = transactions.map((t) => ({
+      Date: formatDateExport(t.date),
+      Type: t.type === 'depot' ? 'Dépôt' : 'Retrait',
+      Montant: Number(t.montant),
+      Description: t.description || '',
+    }));
+    exporterExcel(`banque-export-${new Date().toISOString().split('T')[0]}.xlsx`, [
+      { nom: 'Banque', lignes, largeurs: [12, 10, 12, 40] },
+    ]);
+  };
+
+  const exporterEnPDF = () => {
+    exporterPDF(`banque-export-${new Date().toISOString().split('T')[0]}.pdf`, {
+      titre: 'Compte bancaire',
+      sousTitre: `Dépôts : ${formatFCFA(totalDepots)}   •   Retraits : ${formatFCFA(totalRetraits)}   •   Solde : ${formatFCFA(solde)}`,
+      sections: [{
+        colonnes: ['Date', 'Type', 'Montant', 'Description'],
+        lignes: transactions.map((t) => [
+          formatDateExport(t.date),
+          t.type === 'depot' ? 'Dépôt' : 'Retrait',
+          formatFCFA(t.montant),
+          t.description || '',
+        ]),
+      }],
+    });
+  };
+
+  const exporterEnWord = () => {
+    exporterWord(`banque-export-${new Date().toISOString().split('T')[0]}.docx`, {
+      titre: 'Compte bancaire',
+      sousTitre: `Dépôts : ${formatFCFA(totalDepots)} — Retraits : ${formatFCFA(totalRetraits)} — Solde : ${formatFCFA(solde)}`,
+      sections: [{
+        colonnes: ['Date', 'Type', 'Montant', 'Description'],
+        lignes: transactions.map((t) => [
+          formatDateExport(t.date),
+          t.type === 'depot' ? 'Dépôt' : 'Retrait',
+          formatFCFA(t.montant),
+          t.description || '',
+        ]),
+      }],
+    });
+  };
+
+  const importerLignes = async (lignesValides) => {
+    const { error } = await supabase.from('banque').insert(lignesValides);
+    if (error) {
+      alert("Erreur lors de l'import : " + error.message);
+    } else {
+      await charger();
+      alert(`${lignesValides.length} transaction(s) importée(s) avec succès.`);
+    }
+  };
+
   const totalDepots = transactions.filter((t) => t.type === 'depot').reduce((s, t) => s + Number(t.montant), 0);
   const totalRetraits = transactions.filter((t) => t.type === 'retrait').reduce((s, t) => s + Number(t.montant), 0);
   const solde = totalDepots - totalRetraits;
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Finances"
-        title="Compte bancaire"
-        description="Suivez les dépôts et retraits effectués sur le compte bancaire de l'église."
-      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+        <PageHeader
+          eyebrow="Finances"
+          title="Compte bancaire"
+          description="Suivez les dépôts et retraits effectués sur le compte bancaire de l'église."
+        />
+        <ExportButtons
+          onExcel={exporter}
+          onPDF={exporterEnPDF}
+          onWord={exporterEnWord}
+          disabled={transactions.length === 0}
+        />
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '28px' }}>
         <StatCard label="Solde actuel" value={formatFCFA(solde)} tone="info" />
@@ -114,6 +182,14 @@ export default function Banque() {
           {saving ? 'Enregistrement…' : type === 'depot' ? 'Enregistrer le dépôt' : 'Enregistrer le retrait'}
         </Button>
       </Card>
+
+      <ExcelImporter
+        titre="Importer depuis Excel ou Word"
+        description="Colonnes attendues : Date (jj/mm/aaaa), Type (Dépôt ou Retrait), Montant, Description (facultative)."
+        normaliser={normaliserLignesBanque}
+        onConfirmer={importerLignes}
+        modeleHref="/modeles/modele-banque.xlsx"
+      />
 
       <SectionTitle>Historique ({transactions.length})</SectionTitle>
 

@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { formatDate } from '../lib/format';
+import { exporterExcel, formatDateExport } from '../lib/excelExport';
+import { exporterPDF } from '../lib/pdfExport';
+import { exporterWord } from '../lib/docxExport';
+import ExportButtons from '../components/ExportButtons';
 import {
   PageHeader, StatCard, Card, SectionTitle, Button,
   Field, fieldStyle, EmptyState, LoadingState,
@@ -90,13 +94,60 @@ export default function Predications() {
   const totalJeunes = predications.reduce((s, p) => s + p.jeunes, 0);
   const totalFormulaire = Number(hommes || 0) + Number(femmes || 0) + Number(enfants || 0) + Number(jeunes || 0);
 
+  const lignesExport = () => predications.map((p) => ({
+    Date: formatDateExport(p.date),
+    'Prédicateur': p.predicateur,
+    'Thème': p.theme,
+    'Textes bibliques': p.textes || '',
+    Hommes: p.hommes,
+    Femmes: p.femmes,
+    Enfants: p.enfants,
+    Jeunes: p.jeunes,
+    Total: p.total,
+  }));
+
+  const exporter = () => {
+    exporterExcel(`predications-export-${new Date().toISOString().split('T')[0]}.xlsx`, [
+      { nom: 'Prédications', lignes: lignesExport(), largeurs: [12, 20, 28, 20, 9, 9, 9, 9, 9] },
+    ]);
+  };
+
+  const exporterEnPDF = () => {
+    exporterPDF(`predications-export-${new Date().toISOString().split('T')[0]}.pdf`, {
+      titre: 'Registre des prédications',
+      sousTitre: `Cumul total : ${totalGeneral} participants sur ${predications.length} culte(s)`,
+      sections: [{
+        colonnes: ['Date', 'Prédicateur', 'Thème', 'H', 'F', 'E', 'J', 'Total'],
+        lignes: predications.map((p) => [
+          formatDateExport(p.date), p.predicateur, p.theme, p.hommes, p.femmes, p.enfants, p.jeunes, p.total,
+        ]),
+      }],
+    });
+  };
+
+  const exporterEnWord = () => {
+    exporterWord(`predications-export-${new Date().toISOString().split('T')[0]}.docx`, {
+      titre: 'Registre des prédications',
+      sousTitre: `Cumul total : ${totalGeneral} participants sur ${predications.length} culte(s)`,
+      sections: [{
+        colonnes: ['Date', 'Prédicateur', 'Thème', 'H', 'F', 'E', 'J', 'Total'],
+        lignes: predications.map((p) => [
+          formatDateExport(p.date), p.predicateur, p.theme, p.hommes, p.femmes, p.enfants, p.jeunes, p.total,
+        ]),
+      }],
+    });
+  };
+
   return (
     <div>
-      <PageHeader
-        eyebrow="Vie spirituelle"
-        title="Registre des prédications"
-        description="Gardez une trace des cultes, des orateurs et de la fréquentation."
-      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+        <PageHeader
+          eyebrow="Vie spirituelle"
+          title="Registre des prédications"
+          description="Gardez une trace des cultes, des orateurs et de la fréquentation."
+        />
+        <ExportButtons onExcel={exporter} onPDF={exporterEnPDF} onWord={exporterEnWord} disabled={predications.length === 0} />
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', marginBottom: '28px' }}>
         <StatCard label="Cumul total" value={totalGeneral} tone="info" />

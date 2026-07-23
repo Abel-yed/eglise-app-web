@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { formatFCFA } from '../lib/format';
+import { exporterExcel, formatDateExport } from '../lib/excelExport';
+import { exporterPDF } from '../lib/pdfExport';
+import { exporterWord } from '../lib/docxExport';
+import ExportButtons from '../components/ExportButtons';
 import { PageHeader, StatCard, Card, SectionTitle, LoadingState, EmptyState, fieldStyle } from '../components/ui';
 
 const MOIS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
@@ -96,13 +100,133 @@ export default function Bilan() {
   const maxMois = Math.max(1, ...parMois.map((m) => Math.max(m.entree, m.sortie)));
   const maxCategorie = Math.max(1, ...parCategorie.map((c) => c.total));
 
+  const exporter = () => {
+    const resume = [
+      { Rubrique: 'Solde global', Montant: totaux.soldeGlobal },
+      { Rubrique: 'Solde caisse', Montant: totaux.soldeCaisse },
+      { Rubrique: 'Solde banque', Montant: totaux.soldeBanque },
+      { Rubrique: 'Recettes (caisse)', Montant: totaux.totalEntrees },
+      { Rubrique: 'Dépenses (caisse)', Montant: totaux.totalSorties },
+      { Rubrique: 'Dépôts (banque)', Montant: totaux.totalDepots },
+      { Rubrique: 'Retraits (banque)', Montant: totaux.totalRetraits },
+    ];
+
+    const categories = parCategorie.map((c) => ({
+      'Catégorie': c.categorie,
+      Entrées: c.entree,
+      Sorties: c.sortie,
+      Total: c.total,
+    }));
+
+    const mensuel = parMois.map((m) => ({
+      Mois: MOIS_LABELS[m.mois],
+      Entrées: m.entree,
+      Sorties: m.sortie,
+    }));
+
+    const effectifs = [
+      { Rubrique: 'Cultes tenus', Valeur: effectifsAnnee.cultes },
+      { Rubrique: 'Total cumulé', Valeur: effectifsAnnee.total },
+      { Rubrique: 'Hommes', Valeur: effectifsAnnee.hommes },
+      { Rubrique: 'Femmes', Valeur: effectifsAnnee.femmes },
+      { Rubrique: 'Enfants', Valeur: effectifsAnnee.enfants },
+      { Rubrique: 'Jeunes', Valeur: effectifsAnnee.jeunes },
+    ];
+
+    const detailCaisse = caisseAnnee.map((t) => ({
+      Date: formatDateExport(t.date),
+      Type: t.type === 'entree' ? 'Entrée' : 'Sortie',
+      'Catégorie': t.categorie,
+      Montant: Number(t.montant),
+      Description: t.description || '',
+    }));
+
+    const detailBanque = banqueAnnee.map((t) => ({
+      Date: formatDateExport(t.date),
+      Type: t.type === 'depot' ? 'Dépôt' : 'Retrait',
+      Montant: Number(t.montant),
+      Description: t.description || '',
+    }));
+
+    exporterExcel(`bilan-${annee}.xlsx`, [
+      { nom: 'Résumé', lignes: resume, largeurs: [26, 14] },
+      { nom: 'Catégories (caisse)', lignes: categories, largeurs: [26, 12, 12, 12] },
+      { nom: 'Évolution mensuelle', lignes: mensuel, largeurs: [10, 12, 12] },
+      { nom: 'Effectifs', lignes: effectifs, largeurs: [20, 12] },
+      { nom: 'Détail caisse', lignes: detailCaisse, largeurs: [12, 10, 26, 12, 40] },
+      { nom: 'Détail banque', lignes: detailBanque, largeurs: [12, 10, 12, 40] },
+    ]);
+  };
+
+  const sectionsRapport = () => [
+    {
+      titre: 'Résumé financier',
+      colonnes: ['Rubrique', 'Montant'],
+      lignes: [
+        ['Solde global', formatFCFA(totaux.soldeGlobal)],
+        ['Solde caisse', formatFCFA(totaux.soldeCaisse)],
+        ['Solde banque', formatFCFA(totaux.soldeBanque)],
+        ['Recettes (caisse)', formatFCFA(totaux.totalEntrees)],
+        ['Dépenses (caisse)', formatFCFA(totaux.totalSorties)],
+        ['Dépôts (banque)', formatFCFA(totaux.totalDepots)],
+        ['Retraits (banque)', formatFCFA(totaux.totalRetraits)],
+      ],
+    },
+    {
+      titre: 'Répartition par catégorie (caisse)',
+      colonnes: ['Catégorie', 'Entrées', 'Sorties', 'Total'],
+      lignes: parCategorie.map((c) => [c.categorie, formatFCFA(c.entree), formatFCFA(c.sortie), formatFCFA(c.total)]),
+    },
+    {
+      titre: 'Évolution mensuelle',
+      colonnes: ['Mois', 'Entrées', 'Sorties'],
+      lignes: parMois.map((m) => [MOIS_LABELS[m.mois], formatFCFA(m.entree), formatFCFA(m.sortie)]),
+    },
+    {
+      titre: 'Effectifs des prédications',
+      colonnes: ['Rubrique', 'Valeur'],
+      lignes: [
+        ['Cultes tenus', effectifsAnnee.cultes],
+        ['Total cumulé', effectifsAnnee.total],
+        ['Hommes', effectifsAnnee.hommes],
+        ['Femmes', effectifsAnnee.femmes],
+        ['Enfants', effectifsAnnee.enfants],
+        ['Jeunes', effectifsAnnee.jeunes],
+      ],
+    },
+  ];
+
+  const exporterEnPDF = () => {
+    exporterPDF(`bilan-${annee}.pdf`, {
+      titre: `Bilan de l'exercice ${annee}`,
+      sousTitre: `Solde global : ${formatFCFA(totaux.soldeGlobal)}`,
+      sections: sectionsRapport(),
+    });
+  };
+
+  const exporterEnWord = () => {
+    exporterWord(`bilan-${annee}.docx`, {
+      titre: `Bilan de l'exercice ${annee}`,
+      sousTitre: `Solde global : ${formatFCFA(totaux.soldeGlobal)}`,
+      sections: sectionsRapport(),
+    });
+  };
+
   return (
     <div>
-      <PageHeader
-        eyebrow="Finances"
-        title={`Bilan de l'exercice ${annee}`}
-        description="Vue d'ensemble consolidée de la caisse, du compte bancaire et de la fréquentation de l'église."
-      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+        <PageHeader
+          eyebrow="Finances"
+          title={`Bilan de l'exercice ${annee}`}
+          description="Vue d'ensemble consolidée de la caisse, du compte bancaire et de la fréquentation de l'église."
+        />
+        <ExportButtons
+          onExcel={exporter}
+          onPDF={exporterEnPDF}
+          onWord={exporterEnWord}
+          disabled={loading || caisseAnnee.length === 0}
+        />
+      </div>
 
       <div style={{ marginBottom: '24px', maxWidth: '200px' }}>
         <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: '6px' }}>

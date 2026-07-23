@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { formatDate } from '../lib/format';
+import { exporterExcel, formatDateExport } from '../lib/excelExport';
+import { exporterPDF } from '../lib/pdfExport';
+import { exporterWord } from '../lib/docxExport';
+import ExportButtons from '../components/ExportButtons';
 import {
   PageHeader, StatCard, Card, SectionTitle, Button,
   Field, fieldStyle, EmptyState, LoadingState, Badge, IconButton,
@@ -96,13 +100,54 @@ export default function Effectifs() {
     });
   }, [membres, filtre, recherche]);
 
+  const exporter = () => {
+    const lignes = listeAffichee.map((m) => ({
+      Nom: m.nom, Prénom: m.prenom, Sexe: m.sexe, 'Catégorie': m.categorie,
+      Téléphone: m.telephone || '', Fonction: m.fonction || '',
+      'Date d\'adhésion': formatDateExport(m.date_adhesion), Statut: m.actif ? 'Actif' : 'Inactif',
+    }));
+    exporterExcel(`effectifs-export-${new Date().toISOString().split('T')[0]}.xlsx`, [
+      { nom: 'Effectifs', lignes, largeurs: [16, 16, 8, 10, 14, 18, 14, 10] },
+    ]);
+  };
+
+  const lignesTableau = () => listeAffichee.map((m) => [
+    `${m.nom} ${m.prenom}`, m.sexe, m.categorie, m.fonction || '—',
+    formatDateExport(m.date_adhesion), m.actif ? 'Actif' : 'Inactif',
+  ]);
+
+  const exporterEnPDF = () => {
+    exporterPDF(`effectifs-export-${new Date().toISOString().split('T')[0]}.pdf`, {
+      titre: "Effectifs de l'église",
+      sousTitre: `${stats.total} membre(s) actif(s) — ${stats.hommes} hommes, ${stats.femmes} femmes`,
+      sections: [{
+        colonnes: ['Nom', 'Sexe', 'Catégorie', 'Fonction', 'Adhésion', 'Statut'],
+        lignes: lignesTableau(),
+      }],
+    });
+  };
+
+  const exporterEnWord = () => {
+    exporterWord(`effectifs-export-${new Date().toISOString().split('T')[0]}.docx`, {
+      titre: "Effectifs de l'église",
+      sousTitre: `${stats.total} membre(s) actif(s) — ${stats.hommes} hommes, ${stats.femmes} femmes`,
+      sections: [{
+        colonnes: ['Nom', 'Sexe', 'Catégorie', 'Fonction', 'Adhésion', 'Statut'],
+        lignes: lignesTableau(),
+      }],
+    });
+  };
+
   return (
     <div>
-      <PageHeader
-        eyebrow="Communauté"
-        title="Effectifs de l'église"
-        description="Le registre des membres, avec répartition par sexe, âge et statut d'engagement."
-      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+        <PageHeader
+          eyebrow="Communauté"
+          title="Effectifs de l'église"
+          description="Le registre des membres, avec répartition par sexe, âge et statut d'engagement."
+        />
+        <ExportButtons onExcel={exporter} onPDF={exporterEnPDF} onWord={exporterEnWord} disabled={membres.length === 0} />
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '28px' }}>
         <StatCard label="Membres actifs" value={stats.total} tone="ink" />
